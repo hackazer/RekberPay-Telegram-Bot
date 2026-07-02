@@ -1,0 +1,6 @@
+.env
+testFile.py
+delete.py
+.idea
+__pycache__
+.venv/
