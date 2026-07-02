@@ -17,29 +17,46 @@ Make sure the following system packages are installed on your Linux server:
 
 ## 2. Option A: Containerized Deployment (Recommended)
 
-This is the easiest path as it bundles the application and the MySQL database without polluting the host environment.
+This runs only the RekberPay application inside Docker, while connecting directly to your host's existing production MySQL server. This prevents any port conflicts or risk of breaking existing services.
 
 ### 2.1. Install Docker and Docker Compose
-Run the official installation script:
+If Docker is not yet installed, install it using the official script:
 ```bash
 curl -fsSL https://get.docker.com | sh
 sudo systemctl enable --now docker
 ```
 
-### 2.2. Clone and Setup Environment
+### 2.2. Configure Host MySQL Access
+To allow the container to securely access the host's MySQL:
+1. Ensure your host's MySQL configuration (`/etc/mysql/mysql.conf.d/mysqld.cnf` or equivalent) allows connections from the Docker bridge gateway interface (typically `127.0.0.1` and `172.17.0.1`, or `0.0.0.0`).
+   * For example, ensure your `bind-address` is set to `0.0.0.0` or includes the Docker gateway IP, and configure your firewall to block public port `3306` access.
+2. In MySQL, create a database and grant access:
+   ```sql
+   CREATE DATABASE rekberpay_db;
+   -- Grant access specifically to the Docker bridge subnet (typically 172.16.0.0/12 or 172.17.0.0/16)
+   CREATE USER 'rekberpay_user'@'%' IDENTIFIED BY 'user_secure_password';
+   GRANT ALL PRIVILEGES ON rekberpay_db.* TO 'rekberpay_user'@'%';
+   FLUSH PRIVILEGES;
+   ```
+
+### 2.3. Setup docker-compose.yml
 1. Copy project files to your server directory (e.g., `/var/www/rekberpay`).
-2. Open `docker-compose.yml` and modify the environment credentials:
+2. Open `docker-compose.yml` and modify the environment settings:
+   * `MYSQL_HOST`: Set to `host.docker.internal` (Docker will resolve this to the host machine gateway IP).
+   * `MYSQL_USER`: `rekberpay_user`
+   * `MYSQL_PASSWORD`: Your password
+   * `MYSQL_DB`: `rekberpay_db`
    * `TOKEN`: Telegram Bot HTTP API token.
    * `MODERATOR_USER_ID`: Telegram numeric ID of the dispute resolver.
    * `ADMIN_USERNAME` / `ADMIN_PASSWORD`: Your credentials for dashboard login.
    * `NOWPAYMENTS_*`: API keys and details.
 
-### 2.3. Run the Services
-Start the containers in detached mode:
+### 2.4. Run the Container
+Start the container in detached mode:
 ```bash
 docker compose up -d --build
 ```
-This automatically configures the database schema and launches both the bot and API listener on port `8050`.
+This launches both the bot and web API listener on port `8050` and safely links to your host's MySQL database.
 
 ---
 
