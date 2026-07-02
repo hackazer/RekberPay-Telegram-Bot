@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RekberPay Admin Dashboard</title>
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        outfit: ['Outfit', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .glass {
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px rgba(255, 255, 255, 0.08) solid;
+        }
+        .glow {
+            box-shadow: 0 0 25px -5px rgba(59, 130, 246, 0.3);
+        }
+        body {
+            background-color: #030712;
+            color: #f3f4f6;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(15, 23, 42, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="font-sans min-h-screen flex flex-col">
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed top-5 right-5 z-50 transform translate-y-[-100px] opacity-0 transition-all duration-300 pointer-events-none">
+        <div class="glass px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border-l-4 border-blue-500 max-w-md">
+            <span id="toast-icon" class="text-blue-400"></span>
+            <p id="toast-message" class="text-sm font-medium text-slate-200"></p>
+        </div>
+    </div>
+
+    <!-- Main Navigation Header -->
+    <header class="glass sticky top-0 z-40 border-b border-white/5 py-4 px-6 md:px-12 flex justify-between items-center">
+        <div class="flex items-center gap-3">
+            <div class="h-10 w-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center glow">
+                <i data-lucide="shield-check" class="text-white h-5 w-5"></i>
+            </div>
+            <div>
+                <h1 class="font-outfit font-extrabold text-xl tracking-wide bg-gradient-to-r from-blue-400 to-indigo-200 bg-clip-text text-transparent">REKBERPAY</h1>
+                <p class="text-[10px] text-slate-400 font-semibold tracking-widest uppercase">Admin Control Panel</p>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="text-right hidden sm:block">
+                <p class="text-sm font-medium text-slate-300">Administrator</p>
+                <p class="text-xs text-green-400 flex items-center gap-1 justify-end">
+                    <span class="h-2 w-2 rounded-full bg-green-400 animate-pulse"></span> System Live
+                </p>
+            </div>
+            <button onclick="logout()" class="glass hover:bg-red-500/20 text-red-400 p-2 rounded-lg transition-all duration-200 hover:border-red-500/30">
+                <i data-lucide="log-out" class="h-5 w-5"></i>
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-col lg:flex-row flex-grow w-full max-w-[1600px] mx-auto px-4 md:px-8 py-8 gap-8">
+        <!-- Sidebar Navigation -->
+        <aside class="w-full lg:w-64 flex flex-col gap-2 shrink-0">
+            <button onclick="switchTab('overview')" id="tab-btn-overview" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium glass hover:bg-white/5 hover:text-white text-blue-400 border-blue-500/40">
+                <i data-lucide="activity" class="h-5 w-5"></i> Overview
+            </button>
+            <button onclick="switchTab('users')" id="tab-btn-users" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+                <i data-lucide="users" class="h-5 w-5"></i> Users Management
+            </button>
+            <button onclick="switchTab('deals')" id="tab-btn-deals" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+                <i data-lucide="briefcase" class="h-5 w-5"></i> Deals Monitoring
+            </button>
+            <button onclick="switchTab('payouts')" id="tab-btn-payouts" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+                <i data-lucide="wallet" class="h-5 w-5"></i> Payout Queue
+            </button>
+            <button onclick="switchTab('api-keys')" id="tab-btn-api-keys" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+                <i data-lucide="key" class="h-5 w-5"></i> REST API Keys
+            </button>
+            <button onclick="switchTab('settings')" id="tab-btn-settings" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white">
+                <i data-lucide="settings" class="h-5 w-5"></i> System Settings
+            </button>
+        </aside>
+
+        <!-- Content Area -->
+        <main class="flex-grow min-w-0">
+            <!-- OVERVIEW TAB -->
+            <section id="tab-overview" class="tab-content flex flex-col gap-6">
+                <!-- Stats Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-2 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 h-16 w-16 bg-blue-500/10 rounded-bl-full flex items-center justify-end pr-4 pt-4">
+                            <i data-lucide="dollar-sign" class="text-blue-400 h-6 w-6"></i>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Volume</span>
+                        <span id="stat-total-volume" class="font-outfit font-bold text-3xl text-white">0.00 USDT</span>
+                        <span class="text-[10px] text-slate-500 mt-2">All-time transaction flow</span>
+                    </div>
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-2 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 h-16 w-16 bg-indigo-500/10 rounded-bl-full flex items-center justify-end pr-4 pt-4">
+                            <i data-lucide="handshake" class="text-indigo-400 h-6 w-6"></i>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Deals</span>
+                        <span id="stat-total-deals" class="font-outfit font-bold text-3xl text-white">0</span>
+                        <span class="text-[10px] text-slate-500 mt-2">Successfully synchronized / created</span>
+                    </div>
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-2 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 h-16 w-16 bg-red-500/10 rounded-bl-full flex items-center justify-end pr-4 pt-4">
+                            <i data-lucide="alert-triangle" class="text-red-400 h-6 w-6"></i>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Active Disputes</span>
+                        <span id="stat-active-disputes" class="font-outfit font-bold text-3xl text-red-400">0</span>
+                        <span class="text-[10px] text-slate-500 mt-2">Requiring immediate moderator attention</span>
+                    </div>
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-2 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 h-16 w-16 bg-purple-500/10 rounded-bl-full flex items-center justify-end pr-4 pt-4">
+                            <i data-lucide="users-2" class="text-purple-400 h-6 w-6"></i>
+                        </div>
+                        <span class="text-xs text-slate-400 font-semibold uppercase tracking-wider">Total Users</span>
+                        <span id="stat-total-users" class="font-outfit font-bold text-3xl text-white">0</span>
+                        <span class="text-[10px] text-slate-500 mt-2">Registered bot users</span>
+                    </div>
+                </div>
+
+                <!-- Recent Activities & Quick Actions -->
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8">
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+                        <h3 class="font-outfit font-bold text-lg flex items-center gap-2">
+                            <i data-lucide="clock" class="text-slate-400 h-5 w-5"></i> Recent Transactions
+                        </h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead>
+                                    <tr class="text-slate-400 border-b border-white/5 pb-2">
+                                        <th class="pb-2 font-medium">Tx ID</th>
+                                        <th class="pb-2 font-medium">User</th>
+                                        <th class="pb-2 font-medium">Type</th>
+                                        <th class="pb-2 font-medium">Amount</th>
+                                        <th class="pb-2 font-medium">Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recent-transactions-list" class="divide-y divide-white/5">
+                                    <tr>
+                                        <td colspan="5" class="py-4 text-center text-slate-500">Loading transactions...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+                        <h3 class="font-outfit font-bold text-lg flex items-center gap-2">
+                            <i data-lucide="help-circle" class="text-slate-400 h-5 w-5"></i> Admin Information & Help
+                        </h3>
+                        <div class="text-slate-300 text-sm leading-relaxed flex flex-col gap-3">
+                            <p>Welcome to the RekberPay Escrow Bot Administration Dashboard. Here you can supervise active escrows, resolve disputes, approve withdrawals, and adjust system settings dynamically.</p>
+                            <div class="bg-blue-950/30 border border-blue-500/20 p-4 rounded-xl flex items-start gap-3">
+                                <i data-lucide="info" class="text-blue-400 h-5 w-5 shrink-0 mt-0.5"></i>
+                                <span class="text-xs text-slate-400">
+                                    <strong>Dispute management:</strong> Clicking <em>Force Release</em> releases held escrow funds directly to the Seller. Clicking <em>Refund</em> returns the funds directly to the Buyer.
+                                </span>
+                            </div>
+                            <div class="bg-indigo-950/30 border border-indigo-500/20 p-4 rounded-xl flex items-start gap-3">
+                                <i data-lucide="credit-card" class="text-indigo-400 h-5 w-5 shrink-0 mt-0.5"></i>
+                                <span class="text-xs text-slate-400">
+                                    <strong>Manual Payout approval:</strong> The Payout Queue displays all transaction withdrawals (type: <code>WITHDRAWAL</code>) that are pending manual review.
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- USERS TAB -->
+            <section id="tab-users" class="tab-content hidden flex flex-col gap-6">
+                <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+                    <div class="flex justify-between items-center gap-4 flex-wrap">
+                        <h2 class="font-outfit font-bold text-xl">Users Management</h2>
+                        <div class="flex gap-2">
+                            <input type="text" id="user-search" placeholder="Search by Telegram ID or Username..." class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white w-64">
+                            <button onclick="loadUsers()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition duration-200 flex items-center gap-2">
+                                <i data-lucide="refresh-cw" class="h-4 w-4"></i> Sync List
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="text-slate-400 border-b border-white/5 pb-2">
+                                    <th class="pb-2">ID</th>
+                                    <th class="pb-2">Telegram ID</th>
+                                    <th class="pb-2">Username</th>
+                                    <th class="pb-2">Wallet Balance</th>
+                                    <th class="pb-2">Suspended</th>
+                                    <th class="pb-2 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="users-list" class="divide-y divide-white/5">
+                                <tr>
+                                    <td colspan="6" class="py-4 text-center text-slate-500">Loading users database...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- DEALS TAB -->
+            <section id="tab-deals" class="tab-content hidden flex flex-col gap-6">
+                <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+                    <div class="flex justify-between items-center gap-4 flex-wrap">
+                        <h2 class="font-outfit font-bold text-xl">Deals Monitoring</h2>
+                        <button onclick="loadDeals()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition duration-200 flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="h-4 w-4"></i> Sync List
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="text-slate-400 border-b border-white/5 pb-2">
+                                    <th class="pb-2">Deal ID</th>
+                                    <th class="pb-2">Buyer</th>
+                                    <th class="pb-2">Seller</th>
+                                    <th class="pb-2">Amount</th>
+                                    <th class="pb-2">Escrow Fee</th>
+                                    <th class="pb-2">Gateway Fee</th>
+                                    <th class="pb-2">Total</th>
+                                    <th class="pb-2">Status</th>
+                                    <th class="pb-2 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="deals-list" class="divide-y divide-white/5">
+                                <tr>
+                                    <td colspan="9" class="py-4 text-center text-slate-500">Loading escrow deals...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- PAYOUTS TAB -->
+            <section id="tab-payouts" class="tab-content hidden flex flex-col gap-6">
+                <div class="glass p-6 rounded-2xl flex flex-col gap-4">
+                    <div class="flex justify-between items-center gap-4 flex-wrap">
+                        <h2 class="font-outfit font-bold text-xl">Manual Payout Queue</h2>
+                        <button onclick="loadPayouts()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition duration-200 flex items-center gap-2">
+                            <i data-lucide="refresh-cw" class="h-4 w-4"></i> Sync List
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-sm">
+                            <thead>
+                                <tr class="text-slate-400 border-b border-white/5 pb-2">
+                                    <th class="pb-2">Payment ID</th>
+                                    <th class="pb-2">User ID</th>
+                                    <th class="pb-2">Amount</th>
+                                    <th class="pb-2">Currency</th>
+                                    <th class="pb-2">Date Created</th>
+                                    <th class="pb-2">Status</th>
+                                    <th class="pb-2 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="payouts-list" class="divide-y divide-white/5">
+                                <tr>
+                                    <td colspan="7" class="py-4 text-center text-slate-500">Loading pending withdrawals...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- API KEYS TAB -->
+            <section id="tab-api-keys" class="tab-content hidden flex flex-col gap-6">
+                <div class="glass p-6 rounded-2xl flex flex-col gap-6">
+                    <h2 class="font-outfit font-bold text-xl">REST API Keys Generator</h2>
+                    
+                    <div class="bg-slate-900/40 p-4 rounded-xl border border-white/5 flex flex-col gap-4">
+                        <h3 class="text-sm font-semibold text-slate-300">Generate New API Key for User</h3>
+                        <div class="flex gap-4 items-end flex-wrap">
+                            <div class="flex flex-col gap-1 w-64">
+                                <label class="text-xs text-slate-400">Target User (Telegram ID)</label>
+                                <input type="number" id="api-key-tg-id" placeholder="e.g. 123456789" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-500 text-white">
+                            </div>
+                            <button onclick="generateApiKey()" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl text-sm font-medium transition duration-200 flex items-center gap-2">
+                                <i data-lucide="key-round" class="h-4 w-4"></i> Generate Key
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-3">
+                        <h3 class="text-sm font-semibold text-slate-300">Active API Keys</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm">
+                                <thead>
+                                    <tr class="text-slate-400 border-b border-white/5 pb-2">
+                                        <th class="pb-2">User ID</th>
+                                        <th class="pb-2">Telegram ID</th>
+                                        <th class="pb-2">API Key</th>
+                                        <th class="pb-2">Status</th>
+                                        <th class="pb-2 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="api-keys-list" class="divide-y divide-white/5">
+                                    <tr>
+                                        <td colspan="5" class="py-4 text-center text-slate-500">Loading api keys...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- SETTINGS TAB -->
+            <section id="tab-settings" class="tab-content hidden flex flex-col gap-6">
+                <div class="glass p-6 rounded-2xl flex flex-col gap-6">
+                    <h2 class="font-outfit font-bold text-xl">System Settings</h2>
+                    
+                    <form id="settings-form" onsubmit="saveSettings(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Moderator Telegram ID</label>
+                            <input type="text" name="moderator_user_id" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Min Withdrawal (USDT)</label>
+                            <input type="number" step="0.01" name="min_withdrawal" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Escrow Fee Percent (%)</label>
+                            <input type="number" step="0.1" name="escrow_fee_percent" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Gateway Fee Percent (%)</label>
+                            <input type="number" step="0.1" name="gateway_fee_percent" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2 md:col-span-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">NOWPayments API URL</label>
+                            <input type="text" name="nowpayments_api_url" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2 md:col-span-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">NOWPayments API Key</label>
+                            <input type="password" name="nowpayments_api_key" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2 md:col-span-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">NOWPayments IPN Callback URL</label>
+                            <input type="text" name="nowpayments_ipn_url" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        <div class="flex flex-col gap-2 md:col-span-2">
+                            <label class="text-xs font-semibold text-slate-400 uppercase tracking-wider">NOWPayments IPN Secret</label>
+                            <input type="password" name="nowpayments_ipn_secret" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 focus:outline-none focus:border-blue-500 text-white text-sm">
+                        </div>
+                        
+                        <div class="md:col-span-2 flex justify-end">
+                            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-xl text-sm font-semibold transition duration-200 flex items-center gap-2 shadow-lg shadow-blue-500/20">
+                                <i data-lucide="save" class="h-4 w-4"></i> Save Settings
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modals for User Edits -->
+    <div id="user-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 opacity-0 pointer-events-none transition-all duration-300">
+        <div class="glass max-w-md w-full p-6 rounded-2xl flex flex-col gap-4 shadow-2xl m-4">
+            <div class="flex justify-between items-center border-b border-white/5 pb-3">
+                <h3 class="font-outfit font-bold text-lg">Edit User Balance</h3>
+                <button onclick="closeModal('user-modal')" class="text-slate-400 hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>
+            </div>
+            <div class="flex flex-col gap-3">
+                <input type="hidden" id="modal-user-id">
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-slate-400">Telegram Username</label>
+                    <input type="text" id="modal-user-username" disabled class="bg-slate-900 border border-white/5 rounded-xl px-4 py-2.5 text-sm text-slate-400 w-full cursor-not-allowed">
+                </div>
+                <div class="flex flex-col gap-1">
+                    <label class="text-xs text-slate-400">Current Balance (USDT)</label>
+                    <input type="number" step="0.00000001" id="modal-user-balance" class="bg-slate-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white w-full focus:outline-none focus:border-blue-500">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 mt-2">
+                <button onclick="closeModal('user-modal')" class="glass hover:bg-white/5 px-4 py-2 rounded-xl text-sm font-medium">Cancel</button>
+                <button onclick="saveUserBalance()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-xl text-sm font-medium transition duration-200">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="glass border-t border-white/5 mt-auto py-6 px-6 text-center text-xs text-slate-500">
+        <p>&copy; 2026 RekberPay Escrow Bot Administration Portal. Dynamic System Hub.</p>
+    </footer>
+
+    <!-- App Logic -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            loadStats();
+            // Search filter for users
+            document.getElementById('user-search').addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+                document.querySelectorAll('#users-list tr').forEach(row => {
+                    const content = row.innerText.toLowerCase();
+                    if (content.includes(query)) {
+                        row.classList.remove('hidden');
+                    } else {
+                        row.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+        // Toast Helper
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+            
+            msg.textContent = message;
+            toast.firstElementChild.className = `glass px-6 py-4 rounded-xl shadow-2xl flex items-center gap-3 border-l-4 ${type === 'success' ? 'border-green-500' : 'border-red-500'} max-w-md`;
+            
+            if (type === 'success') {
+                icon.innerHTML = '<i data-lucide="check-circle-2" class="text-green-400 h-5 w-5"></i>';
+            } else {
+                icon.innerHTML = '<i data-lucide="alert-circle" class="text-red-400 h-5 w-5"></i>';
+            }
+            lucide.createIcons();
+            
+            toast.classList.remove('translate-y-[-100px]', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-[-100px]', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+
+        // Tab Switching
+        function switchTab(tabId) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Remove active style from all tab buttons
+            document.querySelectorAll('aside button').forEach(el => {
+                el.className = "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium text-slate-400 hover:bg-white/5 hover:text-white";
+            });
+            
+            // Show selected tab content
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            
+            // Add active style to selected tab button
+            const activeBtn = document.getElementById(`tab-btn-${tabId}`);
+            activeBtn.className = "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-left font-medium glass hover:bg-white/5 hover:text-white text-blue-400 border-blue-500/40";
+            
+            // Load relevant tab data
+            if (tabId === 'overview') loadStats();
+            else if (tabId === 'users') loadUsers();
+            else if (tabId === 'deals') loadDeals();
+            else if (tabId === 'payouts') loadPayouts();
+            else if (tabId === 'api-keys') loadApiKeys();
+            else if (tabId === 'settings') loadSettingsForm();
+        }
+
+        // Log out
+        function logout() {
+            var xmlhttp = new XMLHttpRequest();
+            xmlhttp.open("GET", "/admin/logout", true);
+            xmlhttp.setRequestHeader("Authorization", "Basic logout");
+            xmlhttp.send();
+            xmlhttp.onreadystatechange = function() {
+                if (xmlhttp.readyState == 4) {
+                    window.location.reload();
+                }
+            }
+        }
+
+        // API Requests
+        async function loadStats() {
+            try {
+                const res = await fetch('/admin/stats');
+                if (!res.ok) throw new Error("Unauthorized or server error");
+                const data = await res.json();
+                
+                document.getElementById('stat-total-volume').textContent = `${parseFloat(data.total_volume).toFixed(2)} USDT`;
+                document.getElementById('stat-total-deals').textContent = data.total_deals;
+                document.getElementById('stat-active-disputes').textContent = data.active_disputes;
+                document.getElementById('stat-total-users').textContent = data.total_users;
+                
+                // Populate recent transactions list
+                const tbody = document.getElementById('recent-transactions-list');
+                tbody.innerHTML = '';
+                if (data.recent_transactions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-500">No transactions recorded yet</td></tr>';
+                } else {
+                    data.recent_transactions.forEach(tx => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-white/5 transition duration-150";
+                        tr.innerHTML = `
+                            <td class="py-3 text-slate-300 font-mono text-xs">${tx.payment_id || 'N/A'}</td>
+                            <td class="py-3 text-slate-400 font-medium">@${tx.username || 'user'}</td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold ${tx.type === 'TOPUP' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}">${tx.type}</span></td>
+                            <td class="py-3 text-slate-200 font-semibold font-mono">${parseFloat(tx.amount).toFixed(4)}</td>
+                            <td class="py-3"><span class="text-xs ${tx.status === 'completed' ? 'text-green-400' : 'text-yellow-400'}">${tx.status}</span></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                console.error(err);
+                showToast("Failed to load statistics: " + err.message, "error");
+            }
+        }
+
+        async function loadUsers() {
+            try {
+                const res = await fetch('/admin/users');
+                const users = await res.json();
+                const tbody = document.getElementById('users-list');
+                tbody.innerHTML = '';
+                
+                users.forEach(u => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/5 transition duration-150";
+                    tr.innerHTML = `
+                        <td class="py-3 text-slate-500">${u.id}</td>
+                        <td class="py-3 font-mono">${u.telegram_id}</td>
+                        <td class="py-3 text-slate-300">@${u.username || 'N/A'}</td>
+                        <td class="py-3 font-semibold text-slate-200 font-mono">${parseFloat(u.wallet_balance).toFixed(8)}</td>
+                        <td class="py-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${u.is_suspended ? 'bg-red-500/20 text-red-400' : 'bg-green-500/20 text-green-400'}">
+                                ${u.is_suspended ? 'Suspended' : 'Active'}
+                            </span>
+                        </td>
+                        <td class="py-3 text-right flex justify-end gap-2">
+                            <button onclick="toggleSuspend(${u.telegram_id}, ${u.is_suspended})" class="glass px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 transition ${u.is_suspended ? 'text-green-400 hover:border-green-500/30' : 'text-red-400 hover:border-red-500/30'}">
+                                ${u.is_suspended ? 'Unsuspend' : 'Suspend'}
+                            </button>
+                            <button onclick="openUserModal(${u.id}, '${u.username || ''}', ${u.wallet_balance})" class="glass px-3 py-1 rounded-lg text-xs font-semibold text-blue-400 hover:border-blue-500/30 hover:bg-slate-800 transition">
+                                Edit Balance
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                showToast("Failed to load users", "error");
+            }
+        }
+
+        async function toggleSuspend(telegramId, isSuspended) {
+            try {
+                const res = await fetch('/admin/users/suspend', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegram_id: telegramId, suspend: !isSuspended })
+                });
+                if (res.ok) {
+                    showToast("User status updated successfully");
+                    loadUsers();
+                } else {
+                    throw new Error("Failed to suspend");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        function openUserModal(id, username, balance) {
+            document.getElementById('modal-user-id').value = id;
+            document.getElementById('modal-user-username').value = '@' + username;
+            document.getElementById('modal-user-balance').value = balance;
+            openModal('user-modal');
+        }
+
+        async function saveUserBalance() {
+            const id = document.getElementById('modal-user-id').value;
+            const balance = document.getElementById('modal-user-balance').value;
+            try {
+                const res = await fetch('/admin/users/balance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: id, balance: parseFloat(balance) })
+                });
+                if (res.ok) {
+                    showToast("User balance updated");
+                    closeModal('user-modal');
+                    loadUsers();
+                } else {
+                    throw new Error("Failed to update balance");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function loadDeals() {
+            try {
+                const res = await fetch('/admin/deals');
+                const deals = await res.json();
+                const tbody = document.getElementById('deals-list');
+                tbody.innerHTML = '';
+                
+                deals.forEach(d => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/5 transition duration-150";
+                    tr.innerHTML = `
+                        <td class="py-3 text-slate-300 font-semibold font-mono">${d.unique_id}</td>
+                        <td class="py-3 text-slate-400">@${d.buyer_username}</td>
+                        <td class="py-3 text-slate-400">@${d.seller_username}</td>
+                        <td class="py-3 font-semibold text-slate-200 font-mono">${parseFloat(d.amount).toFixed(4)}</td>
+                        <td class="py-3 font-mono text-slate-400">${parseFloat(d.escrow_fee).toFixed(4)}</td>
+                        <td class="py-3 font-mono text-slate-400">${parseFloat(d.gateway_fee).toFixed(4)}</td>
+                        <td class="py-3 font-semibold text-white font-mono">${parseFloat(d.total_amount).toFixed(4)}</td>
+                        <td class="py-3">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${
+                                d.status === 'Completed' ? 'bg-green-500/10 text-green-400' :
+                                d.status === 'Disputed' ? 'bg-red-500/10 text-red-400' :
+                                d.status === 'Canceled' ? 'bg-slate-500/10 text-slate-400' :
+                                'bg-yellow-500/10 text-yellow-400'
+                            }">${d.status}</span>
+                        </td>
+                        <td class="py-3 text-right flex justify-end gap-2">
+                            ${d.status === 'Disputed' || d.status === 'Active' ? `
+                                <button onclick="disputeResolve(${d.unique_id}, 'release')" class="glass text-green-400 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:border-green-500/30 transition">
+                                    Release
+                                </button>
+                                <button onclick="disputeResolve(${d.unique_id}, 'refund')" class="glass text-red-400 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:border-red-500/30 transition">
+                                    Refund
+                                </button>
+                            ` : '<span class="text-slate-500 text-xs">No Action</span>'}
+                        </td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            } catch (err) {
+                showToast("Failed to load deals", "error");
+            }
+        }
+
+        async function disputeResolve(uniqueId, action) {
+            try {
+                const res = await fetch(`/admin/deals/dispute-resolve`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ unique_id: uniqueId, action: action })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(`Deal dispute resolved: ${action} processed`);
+                    loadDeals();
+                } else {
+                    throw new Error(data.error || "Failed to resolve dispute");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function loadPayouts() {
+            try {
+                const res = await fetch('/admin/payouts');
+                const payouts = await res.json();
+                const tbody = document.getElementById('payouts-list');
+                tbody.innerHTML = '';
+                
+                if (payouts.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="py-4 text-center text-slate-500">No pending payouts</td></tr>';
+                } else {
+                    payouts.forEach(p => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-white/5 transition duration-150";
+                        tr.innerHTML = `
+                            <td class="py-3 font-mono text-slate-300 text-xs">${p.payment_id}</td>
+                            <td class="py-3 text-slate-400">${p.user_id}</td>
+                            <td class="py-3 font-semibold text-slate-200 font-mono">${parseFloat(p.amount).toFixed(4)}</td>
+                            <td class="py-3 text-slate-400 font-bold">${p.currency}</td>
+                            <td class="py-3 text-slate-400">${new Date(p.created_at).toLocaleString()}</td>
+                            <td class="py-3"><span class="px-2 py-0.5 rounded text-[10px] font-bold bg-yellow-500/10 text-yellow-400">${p.status}</span></td>
+                            <td class="py-3 text-right flex justify-end gap-2">
+                                <button onclick="processPayout('${p.payment_id}', 'approve')" class="glass text-green-400 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:border-green-500/30 transition">
+                                    Approve
+                                </button>
+                                <button onclick="processPayout('${p.payment_id}', 'reject')" class="glass text-red-400 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:border-red-500/30 transition">
+                                    Reject
+                                </button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                showToast("Failed to load payouts", "error");
+            }
+        }
+
+        async function processPayout(paymentId, action) {
+            try {
+                const res = await fetch('/admin/payouts/approve', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ payment_id: paymentId, action: action })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast(`Payout request ${action}d successfully`);
+                    loadPayouts();
+                } else {
+                    throw new Error(data.error || "Failed to process payout");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function loadApiKeys() {
+            try {
+                const res = await fetch('/admin/api-keys');
+                const keys = await res.json();
+                const tbody = document.getElementById('api-keys-list');
+                tbody.innerHTML = '';
+                
+                if (keys.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-500">No API Keys registered</td></tr>';
+                } else {
+                    keys.forEach(k => {
+                        const tr = document.createElement('tr');
+                        tr.className = "hover:bg-white/5 transition duration-150";
+                        tr.innerHTML = `
+                            <td class="py-3 text-slate-500">${k.user_id}</td>
+                            <td class="py-3 font-mono text-slate-400">${k.telegram_id}</td>
+                            <td class="py-3 font-mono text-slate-200">${k.api_key}</td>
+                            <td class="py-3">
+                                <span class="px-2 py-0.5 rounded text-[10px] font-bold ${k.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}">
+                                    ${k.is_active ? 'Active' : 'Revoked'}
+                                </span>
+                            </td>
+                            <td class="py-3 text-right">
+                                ${k.is_active ? `
+                                    <button onclick="revokeApiKey(${k.id})" class="glass text-red-400 px-3 py-1 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:border-red-500/30 transition">
+                                        Revoke
+                                    </button>
+                                ` : '<span class="text-slate-500 text-xs">No Action</span>'}
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (err) {
+                showToast("Failed to load API keys", "error");
+            }
+        }
+
+        async function generateApiKey() {
+            const telegramId = document.getElementById('api-key-tg-id').value;
+            if (!telegramId) {
+                showToast("Please enter a valid Telegram ID", "error");
+                return;
+            }
+            try {
+                const res = await fetch('/admin/api-keys/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ telegram_id: parseInt(telegramId) })
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                    showToast("API Key generated successfully");
+                    document.getElementById('api-key-tg-id').value = '';
+                    loadApiKeys();
+                } else {
+                    throw new Error(data.error || "Failed to generate API Key");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function revokeApiKey(id) {
+            try {
+                const res = await fetch(`/admin/api-keys/revoke/${id}`, {
+                    method: 'POST'
+                });
+                if (res.ok) {
+                    showToast("API Key revoked");
+                    loadApiKeys();
+                } else {
+                    throw new Error("Failed to revoke API Key");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        async function loadSettingsForm() {
+            try {
+                const res = await fetch('/admin/settings');
+                const settings = await res.json();
+                const form = document.getElementById('settings-form');
+                
+                for (const key in settings) {
+                    if (form.elements[key]) {
+                        form.elements[key].value = settings[key] || '';
+                    }
+                }
+            } catch (err) {
+                showToast("Failed to load settings", "error");
+            }
+        }
+
+        async function saveSettings(event) {
+            event.preventDefault();
+            const form = event.target;
+            const data = {};
+            new FormData(form).forEach((value, key) => {
+                data[key] = value;
+            });
+            try {
+                const res = await fetch('/admin/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                if (res.ok) {
+                    showToast("Settings saved successfully");
+                } else {
+                    throw new Error("Failed to save settings");
+                }
+            } catch (err) {
+                showToast(err.message, "error");
+            }
+        }
+
+        // Modal Helpers
+        function openModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.remove('pointer-events-none', 'opacity-0');
+            modal.classList.add('opacity-100');
+        }
+
+        function closeModal(id) {
+            const modal = document.getElementById(id);
+            modal.classList.add('pointer-events-none', 'opacity-0');
+            modal.classList.remove('opacity-100');
+        }
+    </script>
+</body>
+</html>

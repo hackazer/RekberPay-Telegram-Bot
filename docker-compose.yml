@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: rekberpay_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_secure_password_please_change
+      MYSQL_DATABASE: rekberpay_db
+      MYSQL_USER: rekberpay_user
+      MYSQL_PASSWORD: user_secure_password_please_change
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  app:
+    build: .
+    container_name: rekberpay_app
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - TOKEN=YOUR_TELEGRAM_BOT_TOKEN
+      - MODERATOR_USER_ID=YOUR_TELEGRAM_MODERATOR_ID
+      - MYSQL_HOST=db
+      - MYSQL_USER=rekberpay_user
+      - MYSQL_PASSWORD=user_secure_password_please_change
+      - MYSQL_DB=rekberpay_db
+      - MYSQL_PORT=3306
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin_secure_password_please_change
+      - SHEETY_URL=YOUR_SHEETY_API_URL
+      # NOWPayments Gateway settings (can also be configured dynamic inside dashboard settings page)
+      - NOWPAYMENTS_API_KEY=YOUR_NOWPAYMENTS_API_KEY
+      - NOWPAYMENTS_API_URL=https://api.nowpayments.io
+      - NOWPAYMENTS_IPN_SECRET=YOUR_NOWPAYMENTS_IPN_SECRET
+      - NOWPAYMENTS_IPN_URL=https://yourdomain.com/webhooks/nowpayments
+      - NOWPAYMENTS_EMAIL=YOUR_NOWPAYMENTS_EMAIL
+      - NOWPAYMENTS_PASSWORD=YOUR_NOWPAYMENTS_PASSWORD
+    depends_on:
+      - db
+
+volumes:
+  mysql_data:

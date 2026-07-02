@@ -38,3 +38,10 @@ MODERATOR_USER_ID = os.getenv("MODERATOR_USER_ID")
 kucoin_api_key = os.getenv("KUCOIN_API_KEY")
 kucoin_api_secret = os.getenv("KUCOIN_API_SECRET")
 kucoin_api_passphrase = os.getenv("KUCOIN_API_PASSPHRASE")
+
+# MongoDB Configuration
+from motor.motor_asyncio import AsyncIOMotorClient
+MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017")
+mongo_client = AsyncIOMotorClient(MONGO_URI)
+mongo_db = mongo_client[os.getenv("MONGO_DB", "rekberpay")]
+collection_lobby = mongo_db["lobby"]

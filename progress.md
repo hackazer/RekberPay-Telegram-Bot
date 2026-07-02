@@ -1,29 +1,33 @@
-# Progress - Task 1.3: Migrate database utility methods to MySQL
+# Progress - Component 5: API Key Authentication & REST API Endpoints
 
 ## Objective
-Migrate all database utility methods in `database/database_utils.py` to use async SQLAlchemy operations with MySQL models, using explicit session passing.
+Implement Component 5:
+1. `X-API-KEY` authentication header dependency verifying API key status and owner suspension status.
+2. `POST /api/v1/deals` endpoint for automated/API-driven deal creation with dynamic gateway fee calculations.
+3. `GET /api/v1/deals/{unique_id}` endpoint to retrieve deal details.
+4. `POST /api/v1/deals/{unique_id}/release` endpoint to trigger escrow release (via user balance or NOWPayments payout depending on the payment method).
+5. Comprehensive test suite under `tests/test_api.py`.
 
-## Plan
-1. [x] Create a local virtual environment and install dependencies (`sqlalchemy`, `aiomysql`, `cryptography`, `aiosqlite`, `pytest`).
-2. [x] Define stubs for all 13 required functions in `database/database_utils.py` that raise `NotImplementedError`.
-3. [x] Create tests in `tests/test_database_utils.py` that assert correct behavior for each of the 13 utility functions.
-4. [x] Run the tests and verify that they fail (RED phase).
-5. [x] Implement the async SQLAlchemy methods one by one or in logical batches.
-6. [x] Re-run tests and verify that they pass (GREEN phase).
-7. [x] Refactor code for optimal performance and style (REFACTOR phase).
-8. [x] Perform final verification and clean up.
+## Implementation Details
 
-## Required Functions to Implement
-1. `get_user_by_telegram_id(session: AsyncSession, telegram_id: int) -> User`
-2. `get_user_by_username(session: AsyncSession, username: str) -> User` (handles stripped '@' symbols)
-3. `get_or_create_user(session: AsyncSession, telegram_id: int, username: str = None) -> User`
-4. `get_active_deal_by_user(session: AsyncSession, telegram_id: int) -> Deal`
-5. `get_deal_by_unique_id(session: AsyncSession, unique_id: int) -> Deal`
-6. `create_deal(session: AsyncSession, unique_id: int, buyer_username: str, seller_username: str, amount: float, transfer_method: str, gateway_fee: float = 0.0, payment_method: str = "GATEWAY") -> Deal`
-7. `save_transaction(session: AsyncSession, user_id: int, deal_id: int, tx_type: str, payment_id: str, amount: float, currency: str, status: str = "waiting") -> Transaction`
-8. `get_transaction_by_payment_id(session: AsyncSession, payment_id: str) -> Transaction`
-9. `update_transaction_status(session: AsyncSession, payment_id: str, status: str, completed: bool = False) -> Transaction`
-10. `get_setting(session: AsyncSession, key_name: str, default: str = None) -> str`
-11. `set_setting(session: AsyncSession, key_name: str, value: str)`
-12. `suspend_user(session: AsyncSession, telegram_id: int, suspend: bool = True)`
-13. `generate_unique_id(session: AsyncSession) -> int`
+### 1. X-API-KEY Authentication Dependency
+- Created `get_api_key` dependency reading the `X-API-KEY` header using `APIKeyHeader`.
+- Verifies key status from the `api_keys` table (returns `401 Unauthorized` if invalid/missing).
+- Verifies the owner user is not suspended (returns `403 Forbidden` if suspended or not found).
+
+### 2. REST Endpoints
+- `POST /api/v1/deals`: Validates the payload using a Pydantic model (`DealCreatePayload`), generates a 4-digit ID via `generate_unique_id`, calculates the gateway fee dynamically based on settings, and inserts the `GATEWAY` deal via `create_deal`.
+- `GET /api/v1/deals/{unique_id}`: Retrieves deal details along with buyer and seller usernames.
+- `POST /api/v1/deals/{unique_id}/release`: Releases funds to the seller (credits WALLET balance or initiates a NOWPayments payout for GATEWAY deals).
+
+### 3. Verification & Test Suite
+- Implemented in `tests/test_api.py` covering:
+  - Auth checks (missing, invalid, revoked keys; suspended, non-existent users).
+  - API key revocation via the admin endpoint.
+  - Deal creation via the REST endpoint (asserting correct dynamic gateway fee calculations).
+  - Deal retrieval via `GET`.
+  - Escrow release triggers for both `WALLET` and `GATEWAY` payment methods, asserting database and wallet state transitions, as well as handling of payout failure scenarios.
+
+## Verification
+- Verified by running all unit tests in the project.
+- **Result**: All 43 tests passed successfully.
