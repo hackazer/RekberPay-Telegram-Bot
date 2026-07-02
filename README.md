@@ -1,48 +1,88 @@
-# Aiogram Escrow Bot
+# RekberPay Telegram Bot
 
-The Aiogram Escrow Bot is a specialized Telegram bot designed to facilitate secure, fast, and automated peer-to-peer (P2P) transactions without the need for a human intermediary. By leveraging the power of escrow services directly within the Telegram platform, this bot ensures that both buyers and sellers can engage in transactions with greater confidence and security.
+RekberPay is an automated peer-to-peer (P2P) transaction escrow bot and web administrator panel designed for secure Telegram group commerce.
 
-## Bot Features
+---
 
-Our Aiogram Escrow Bot comes packed with features aimed at simplifying the transaction process for users:
+## Key Features
 
-- **Automated Escrow Transactions**: The bot manages the escrow process from start to finish, holding funds until both parties are satisfied with the transaction.
-- **Support for Multiple Cryptocurrencies**: Engage in transactions using various cryptocurrencies, enhancing flexibility and choice for users.
-- **Streamlined User Interactions**: Utilize inline keyboards for an intuitive and seamless user experience.
-- **Real-time Updates**: Receive instant notifications about the status of your transactions, keeping you informed every step of the way.
+* **Dual Payment Workflows:** Transact natively using internal user wallets or process automated payments through the NOWPayments API gateway.
+* **FastAPI Admin Dashboard:** Manage settings, users, dispute release/refund actions, and monitor live transactions from a secure web portal.
+* **External REST API:** Allows external developers to generate API keys, create deals, and monitor transactions programmatically.
+* **Security Audited:** Strict SHA512 HMAC signature checks on payment webhooks and role-based access validation on FSM callbacks.
+* **MySQL Storage:** Powered by SQLAlchemy Async Engine for robust query processing and connection pool scaling.
 
-## How It Works
+---
 
-### Starting a Transaction
+## Project Structure
 
-To initiate a transaction, one party (the buyer or the seller) starts the bot with the `/start_deal` command. The bot then guides the user through the process of setting up the transaction, including specifying the transaction amount and the other party's Telegram username.
+```
+├── Dockerfile                  # Application Docker setup
+├── README.md                   # Project documentation
+├── config.py                   # Environment and database configuration
+├── deploy                      # Deployment guides and documentation
+│   └── README.md
+├── docker-compose.yml          # Container configuration
+├── main.py                     # Entry point (FastAPI web server & Telegram bot task runner)
+├── database
+│   ├── database_utils.py       # Async SQL query wrappers
+│   └── models.py               # Declarative SQLAlchemy models
+├── handlers
+│   ├── commands.py             # User message and command routing
+│   └── inline_process.py       # Inline keyboard callbacks and FSM state flows
+├── states
+│   └── form_states.py          # State definitions
+├── templates
+│   └── dashboard.html          # Web dashboard layout
+└── tests                       # Suite of 43 unit and integration tests
+```
 
-### Setting the Escrow
+---
 
-Once the initial setup is complete, the bot takes over the role of an escrow agent. For buyers, it will provide instructions on sending funds to the escrow account. For sellers, it notifies them that the transaction has begun and that funds will be held securely until the transaction conditions are met.
+## Quick Start (Local Testing)
 
-### Completing the Transaction
+1. Clone the repository and navigate to the project directory:
+   ```bash
+   git clone https://github.com/hackazer/RekberPay-Telegram-Bot.git
+   cd RekberPay-Telegram-Bot
+   ```
 
-Upon confirmation of the funds received in escrow and the buyer's receipt of the goods or services, the bot facilitates the transfer of funds from the escrow account to the seller, completing the transaction. 
+2. Initialize a Python virtual environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -r requirements.txt
+   ```
 
-### Cancelling a Transaction
+3. Configure your local configuration inside `.env`.
 
-If a transaction needs to be canceled for any reason, users can employ the `/cancel_trade` command. The bot ensures that any funds in escrow are returned to the buyer, provided the transaction conditions allow for cancellation.
+4. Run the automated test suite to verify the setup:
+   ```bash
+   PYTHONPATH=. .venv/bin/pytest tests/ -v
+   ```
 
-## Engaging with the Bot
+5. Start the bot and web server:
+   ```bash
+   python main.py
+   ```
+   The API will listen on `http://localhost:8050/` and the admin portal will be available at `http://localhost:8050/admin`.
 
-The Aiogram Escrow Bot is designed for ease of use. Simply search for [BotUsername] on Telegram to start. The bot offers a help menu through the `/help` command, providing users with information on all available commands and how to use them for transactions.
+---
 
-## Security and Privacy
+## Production Deployment
 
-Security and privacy are our top priorities. The bot employs state-of-the-art encryption and security protocols to protect all transactions. Users can engage with the bot, knowing their information and funds are handled with the utmost care and confidentiality.
+Detailed deployment configuration guides for Nginx, SSL certificates, systemd background daemons, and Docker environments can be found in the [deploy/README.md](deploy/README.md) file.
 
-## Support and Feedback
+---
 
-We are continually working to improve the Aiogram Escrow Bot and welcome any feedback or suggestions. For support, questions, or feedback, please contact us through Telegram at [@YourSupportBot] or via email at support@example.com.
+## Copyright & Credits
 
-## Disclaimer
+Copyright (c) 2026 [RekberPay](https://rekberpay.com).
 
-This bot is provided as-is, and while we strive to ensure reliability and security, users should engage with the bot at their own risk. Always ensure you are comfortable with the transaction and the other party before proceeding.
+This project is led by [Rizaldy Primanta Putra](https://riz.my.id) and is a part of the KSATRIA Indonesia Group.
 
-Thank you for considering the Aiogram Escrow Bot for your P2P transaction needs. We look forward to serving you and making your transaction experience on Telegram as smooth and secure as possible.
+---
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).

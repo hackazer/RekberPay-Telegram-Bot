@@ -20,7 +20,7 @@ services:
     container_name: rekberpay_app
     restart: always
     ports:
-      - "8000:8000"
+      - "8050:8050"
     environment:
       - TOKEN=YOUR_TELEGRAM_BOT_TOKEN
       - MODERATOR_USER_ID=YOUR_TELEGRAM_MODERATOR_ID

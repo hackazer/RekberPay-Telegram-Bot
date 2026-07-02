@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY . /app/
 
 # Expose FastAPI port
-EXPOSE 8000
+EXPOSE 8050
 
 # Start Bot + FastAPI application concurrently
 CMD ["python", "main.py"]
