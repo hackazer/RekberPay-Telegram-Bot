@@ -181,3 +181,41 @@ sudo ln -s /snap/bin/certbot /usr/bin/certbot
 sudo certbot --nginx -d tg.rekberpay.com
 ```
 Follow the interactive prompts to enable SSL redirection. Nginx will automatically handle SSL handshake and route traffic safely to the bot ecosystem.
+
+---
+
+## 6. Process Management via PM2
+
+If your server runs multiple JavaScript projects, you can use PM2 to manage the lifecycle of the RekberPay application.
+
+### 6.1. PM2 managing the Python app natively on the Host
+Run the python process natively using PM2 on the host:
+```bash
+# Navigate to project root directory
+pm2 start main.py --name "rekberpay-bot" --interpreter .venv/bin/python
+pm2 save
+pm2 startup
+```
+
+### 6.2. PM2 managing the Docker Container lifecycle on the Host
+Monitor the container lifecycle via PM2 on the host by creating an `ecosystem.config.js` file:
+```javascript
+module.exports = {
+  apps: [
+    {
+      name: "rekberpay-docker",
+      script: "docker compose up --build",
+      autorestart: true,
+      watch: false
+    }
+  ]
+};
+```
+Start it using:
+```bash
+pm2 start ecosystem.config.js
+```
+
+### 6.3. PM2 running inside the Docker Container
+If you prefer PM2 to act as the internal entrypoint inside the container, update the `Dockerfile` to install Node.js and PM2, then start using:
+`CMD ["pm2-runtime", "start", "main.py", "--name", "rekberpay-app", "--interpreter", "python3"]`
