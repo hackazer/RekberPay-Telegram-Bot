@@ -13,13 +13,16 @@ from utils import global_command_filter, RoleFilter, button_builder, send_divide
 from wallet_processing import create_payment, create_payout, get_payment_status
 from config import async_session
 from states.user_registration import UserRegistration
+from states.form_states import DealCreation
 from database.database_utils import (
     get_or_create_user,
     get_user_by_telegram_id,
     get_user_by_username,
     get_setting,
     save_transaction,
-    update_transaction_status
+    update_transaction_status,
+    create_deal,
+    generate_unique_id
 )
 from database.models import User, Deal, Transaction
 from sqlalchemy.future import select
@@ -29,8 +32,8 @@ form_router = Router()
 form_router.message.filter(global_command_filter)
 
 
-@form_router.callback_query(F.data == "submitted_form")
-async def submitted_form_handler(callback: types.CallbackQuery, state: FSMContext) -> None:
+@form_router.callback_query(F.data.in_(["create_method_wallet", "create_method_gateway"]))
+async def process_create_deal_method(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     
     # Check user suspension state at the beginning
@@ -40,80 +43,75 @@ async def submitted_form_handler(callback: types.CallbackQuery, state: FSMContex
             await callback.message.answer("⛔ Your account has been suspended by the administrator.")
             return
 
-    username = callback.from_user.username
-    start_time = asyncio.get_event_loop().time()
-    found = False
-    await callback.message.edit_reply_markup()
-    
+    data = await state.get_data()
+    buyer_id = data.get("buyer_id")
+    seller_username = data.get("seller_username")
+    amount = data.get("amount")
+    group_id = data.get("group_id")
+
+    if not all([buyer_id, seller_username, amount, group_id]):
+        await callback.message.answer("⚠️ Missing deal configuration data. Please restart /new_deal in your group.")
+        await state.clear()
+        return
+
+    payment_method = "WALLET" if callback.data == "create_method_wallet" else "GATEWAY"
+
+    async with async_session() as session:
+        unique_id = await generate_unique_id(session)
+        buyer = await get_user_by_telegram_id(session, buyer_id)
+        buyer_username = buyer.username if buyer else callback.from_user.username
+        if not buyer_username:
+            buyer_username = f"user_{buyer_id}"
+            
+        gateway_fee = 0.0
+        if payment_method == "GATEWAY":
+            gateway_pct_str = await get_setting(session, "gateway_fee_percent", "1.0")
+            try:
+                gateway_pct = Decimal(gateway_pct_str)
+            except Exception:
+                gateway_pct = Decimal("1.0")
+            gateway_fee = float(Decimal(str(amount)) * (gateway_pct / Decimal("100.0")))
+
+        deal = await create_deal(
+            session=session,
+            unique_id=unique_id,
+            buyer_username=buyer_username,
+            seller_username=seller_username,
+            amount=amount,
+            transfer_method="USDT_TRON",
+            gateway_fee=gateway_fee,
+            payment_method=payment_method
+        )
+
+    await state.clear()
+    await callback.message.answer("✅ Deal created successfully! The confirmation link has been sent to the group chat.")
+
+    method_display = "Internal Wallet" if payment_method == "WALLET" else "Payment Gateway"
+    group_text = (
+        f"🔍 <b>Deal Confirmation (ID: {unique_id})</b>\n"
+        "Please review the details:\n\n"
+        f"👤 Seller: @{seller_username}\n"
+        f"👥 Buyer: @{buyer_username}\n"
+        f"💳 Payment Method: {method_display}\n"
+        f"💰 Amount: {amount} USDT\n\n"
+        "If correct, both parties please confirm by clicking 'Continue with the deal'."
+    )
+
+    reply_keyboard = await button_builder(
+        ["The data is incorrect", "Continue with the deal"],
+        ["resubmit_form", "continue_deal"]
+    )
+    reply_keyboard.adjust(1, 1)
+
     try:
-        while (asyncio.get_event_loop().time() - start_time) < (15 * 60):  # 15 minutes
-            async with async_session() as session:
-                result = await session.execute(
-                    select(Deal).where(Deal.status == 'Active')
-                )
-                deals = result.scalars().all()
-                
-                document = None
-                buyer_username = None
-                seller_username = None
-                
-                for d in deals:
-                    buyer_res = await session.execute(select(User).where(User.id == d.buyer_id))
-                    buyer = buyer_res.scalars().first()
-                    seller_res = await session.execute(select(User).where(User.id == d.seller_id))
-                    seller = seller_res.scalars().first()
-                    
-                    if (buyer and buyer.username == username.lstrip('@')) or (seller and seller.username == username.lstrip('@')):
-                        document = d
-                        buyer_username = buyer.username if buyer else "Not Provided"
-                        seller_username = seller.username if seller else "Not Provided"
-                        break
-                        
-                if document:
-                    try:
-                        await state.update_data(unique_id=document.unique_id, seller=seller_username)
-                    except Exception as e:
-                        logger.error(f"Error updating state data: {e}")
-                        await callback.message.answer("There was an error processing your submission. Please try again.")
-                        break
-
-                    found = True
-                    await callback.message.answer("Your submission has been confirmed!", reply_markup=ReplyKeyboardRemove())
-
-                    deal_data = (
-                        "🔍 <b>Deal Confirmation</b>\n"
-                        "Please review the details of your transaction carefully:\n\n"
-                        f"👤 <b>Seller:</b> @{seller_username}\n"
-                        f"👥 <b>Buyer:</b> @{buyer_username}\n"
-                        f"💳 <b>Payment Method:</b> {document.payment_method}\n"
-                        f"💰 <b>Amount:</b> {document.amount} USDT\n"
-                        f"🆔 <b>Deal ID:</b> {document.unique_id}\n\n"
-                        "This ID is essential for dispute resolution or any further assistance.\n\n"
-                        "If all details are correct, please <b>confirm</b> by clicking 'Continue with the deal' below.\n"
-                        "To modify any information, use the 'Data is incorrect' button to submit again."
-                    )
-
-                    reply_keyboard = await button_builder(
-                        ["The data is incorrect. Submit again", 'Continue with the deal'],
-                        ["resubmit_form", "continue_deal"])
-                    reply_keyboard.adjust(1, 1)
-                    await send_divider(callback)
-                    await callback.message.answer(deal_data,
-                                                  reply_markup=reply_keyboard.as_markup(),
-                                                  parse_mode=ParseMode.HTML)
-                    break
-            await asyncio.sleep(15)
-
-        if not found:
-            reply_keyboard = await button_builder(["Retry submission"], ["submitted_form"])
-            await callback.message.answer("We could not find your submission. Please submit the form again.",
-                                          reply_markup=reply_keyboard.as_markup())
-
-        await state.set_state(UserRegistration.awaiting_deal_continuation)
-
+        await callback.bot.send_message(
+            chat_id=group_id,
+            text=group_text,
+            reply_markup=reply_keyboard.as_markup(),
+            parse_mode=ParseMode.HTML
+        )
     except Exception as e:
-        logger.exception(f"An error occurred during form submission handling: {e}")
-        await callback.message.answer("An unexpected error occurred. Please contact support.")
+        logger.error(f"Failed to post deal confirmation to group {group_id}: {e}")
 
 
 @form_router.callback_query(F.data == "resubmit_form")
@@ -149,23 +147,10 @@ async def handle_incorrect_data_submission(callback: types.CallbackQuery) -> Non
             await session.commit()
 
     message_text = (
-        "🙇‍♂️ <b>Oops! Looks like we need a bit more info.</b>\n\n"
-        "No worries at all! It happens to the best of us. Here’s a quick way to get everything sorted:\n\n"
-        "1️⃣ <a href='https://docs.google.com/forms/d/e/1FAIpQLSejcvHsgFE2fhfewtlss6ZpMQphPHYw6-l7k6gmdrjh-9gslw/"
-        "viewform?usp=sf_link'>"
-        "Click here to revisit the form</a> and fill in the missing or incorrect details.\n\n"
-        "2️⃣ Once you’ve made the updates, hit the 'I've submitted the form' button below to let me know. 📬\n\n"
-        "Take your time, and if you have any questions or need help along the way, just give me a shout!"
+        "❌ <b>The deal configuration was marked as incorrect and has been cancelled.</b>\n\n"
+        "Please run /new_deal in the group chat to configure a new deal."
     )
-
-    reply_keyboard = await button_builder(["Confirm form resubmission"], ["submitted_form"])
-    await send_divider(callback)
-    await callback.message.answer(
-        message_text,
-        reply_markup=reply_keyboard.as_markup(),
-        disable_web_page_preview=True,
-        parse_mode=ParseMode.HTML
-    )
+    await callback.message.answer(message_text, parse_mode=ParseMode.HTML)
 
 
 @form_router.callback_query(F.data == "continue_deal")

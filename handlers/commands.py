@@ -10,7 +10,7 @@ from aiogram.types import (
 from utils import RoleFilter, get_data_from_db, button_builder, global_command_filter, GroupChatFilter, send_divider
 from config import collection_lobby, MODERATOR_USER_ID, async_session
 from states.user_registration import UserRegistration
-from states.form_states import WalletStates
+from states.form_states import WalletStates, DealCreation
 from database.database_utils import (
     get_or_create_user,
     get_setting,
@@ -32,12 +32,29 @@ deal_commands_router.message.filter(global_command_filter)
 
 
 @deal_commands_router.message(CommandStart())
-async def start(message: types.Message):
+async def start(message: types.Message, state: FSMContext):
     async with async_session() as session:
         user = await get_or_create_user(session, message.from_user.id, message.from_user.username)
         if user.is_suspended:
             await message.answer("⛔ Your account has been suspended by the administrator.")
             return
+
+    # Check for deep link arguments
+    if isinstance(message.text, str):
+        command_args = message.text.split(maxsplit=1)
+        if len(command_args) > 1:
+            param = command_args[1].strip()
+            if param.startswith("new_deal_"):
+                group_id_str = param.replace("new_deal_", "")
+                try:
+                    group_id = int(group_id_str)
+                except ValueError:
+                    group_id = group_id_str
+                
+                await state.update_data(group_id=group_id, buyer_id=message.from_user.id)
+                await state.set_state(DealCreation.awaiting_seller_username)
+                await message.answer("Please enter the Seller's Telegram Username (including @):")
+                return
 
     if message.chat.type == "private":
         group_message = (
@@ -98,7 +115,7 @@ Remember: Always exercise caution when conducting transactions online. Verify th
     await message.answer(help_text, parse_mode=ParseMode.HTML)
 
 
-@deal_commands_router.message(Command("new_deal"), GroupChatFilter())
+@deal_commands_router.message(Command("new_deal"))
 async def create_a_lobby(message: Message, state: FSMContext) -> None:
     async with async_session() as session:
         user = await get_or_create_user(session, message.from_user.id, message.from_user.username)
@@ -106,43 +123,24 @@ async def create_a_lobby(message: Message, state: FSMContext) -> None:
             await message.answer("⛔ Your account has been suspended by the administrator.")
             return
 
-    username = message.from_user.username
-    if username.startswith('@'):
-        username = username[1:]  # Remove '@' if present at the beginning.
-    # Check if the user has an active deal
-    active_deal = await collection_lobby.find_one({
-        "$or": [
-            {"Seller's Telegram User": f"{username}", "Status": "Active"},
-            {"Buyer's Telegram User": f"{username}", "Status": "Active"}
-        ]
-    })
-
-    if active_deal:
-        # Inform the user that they have an active deal
-        await message.answer("You already have an active deal. Please complete or cancel your "
-                             "existing deal before starting a new one.")
-        return
-
-    # Proceed with creating a new deal lobby
-    reply_keyboard = await button_builder(["Submitted the Form"], ["submitted_form"])
-
-    message_text = (
-        "📝 <b>Let's get started with your transaction!</b>\n\n"
-        "Please take a moment to fill out the details of your deal in the form linked below. "
-        "This information will ensure everything goes smoothly and securely.\n\n"
-        "👉 <a href='https://docs.google.com/forms/d/e/1FAIpQLSejcvHsgFE2fhfewtlss6ZpMQphPHYw6-l7k6gmdrjh-9gslw/"
-        "viewform?usp=sf_link'>Click here to access the Google Form</a>\n\n"
-        "Once you've filled out the form, let me know by clicking the 'I've submitted the form' button or by typing "
-        "<i>'I submitted the form'</i>.\n\n"
-        "If you need help at any point, don't hesitate to ask!"
-    )
-
-    await message.answer(
-        message_text,
-        reply_markup=reply_keyboard.as_markup(),
-        disable_web_page_preview=True,
-        parse_mode=ParseMode.HTML
-    )
+    if message.chat.type in ['group', 'supergroup']:
+        bot_info = await message.bot.get_me()
+        bot_username = bot_info.username
+        group_id = message.chat.id
+        deep_link = f"https://t.me/{bot_username}?start=new_deal_{group_id}"
+        
+        text = (
+            "📝 <b>Create a New Deal</b>\n\n"
+            "To configure the deal details securely, click the button below to message me in private."
+        )
+        builder = InlineKeyboardBuilder()
+        builder.add(types.InlineKeyboardButton(text="Configure Deal", url=deep_link))
+        await message.answer(text, reply_markup=builder.as_markup(), parse_mode=ParseMode.HTML)
+    else:
+        await message.answer(
+            "⚠️ Deals must be initiated inside a group chat so both parties can participate. "
+            "Please run /new_deal in your transaction group chat."
+        )
 
 
 @deal_commands_router.message(Command("sent_wallet"), RoleFilter("Seller", collection_lobby), GroupChatFilter())
@@ -670,3 +668,64 @@ async def process_withdrawal_amount(message: types.Message, state: FSMContext):
         "Your withdrawal has been queued for manual admin approval."
     )
     await message.answer(response_text, parse_mode=ParseMode.HTML)
+
+
+@deal_commands_router.message(DealCreation.awaiting_seller_username)
+async def process_seller_username(message: Message, state: FSMContext):
+    async with async_session() as session:
+        user = await get_or_create_user(session, message.from_user.id, message.from_user.username)
+        if user.is_suspended:
+            await message.answer("⛔ Your account has been suspended by the administrator.")
+            return
+
+    username = message.text.strip()
+    if not username.startswith('@'):
+        username = '@' + username
+    
+    buyer_username = message.from_user.username
+    if buyer_username:
+        buyer_username = buyer_username.lstrip('@')
+    
+    stripped = username.lstrip('@')
+    
+    if buyer_username and stripped.lower() == buyer_username.lower():
+        await message.reply("⚠️ You cannot enter your own username as the Seller. Please enter a different Seller's username:")
+        return
+
+    # Query the database to get/create the user (using telegram_id=-1)
+    async with async_session() as session:
+        await get_or_create_user(session, telegram_id=-1, username=stripped)
+
+    await state.update_data(seller_username=stripped)
+    await state.set_state(DealCreation.awaiting_amount)
+    await message.answer("Please enter the transaction amount in USDT:")
+
+
+@deal_commands_router.message(DealCreation.awaiting_amount)
+async def process_deal_amount(message: Message, state: FSMContext):
+    async with async_session() as session:
+        user = await get_or_create_user(session, message.from_user.id, message.from_user.username)
+        if user.is_suspended:
+            await message.answer("⛔ Your account has been suspended by the administrator.")
+            return
+
+    try:
+        amount = Decimal(message.text.strip())
+        if amount <= 0:
+            raise ValueError()
+    except ValueError:
+        await message.reply("⚠️ Invalid amount. Please enter a positive number:")
+        return
+
+    await state.update_data(amount=float(amount))
+    await state.set_state(DealCreation.awaiting_payment_method)
+    
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="Internal Wallet", callback_data="create_method_wallet"))
+    builder.add(types.InlineKeyboardButton(text="Payment Gateway", callback_data="create_method_gateway"))
+    builder.adjust(2)
+    
+    await message.answer(
+        "Please select a payment method for the deal:",
+        reply_markup=builder.as_markup()
+    )

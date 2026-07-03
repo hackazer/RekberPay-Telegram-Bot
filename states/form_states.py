@@ -14,3 +14,10 @@ class WalletStates(StatesGroup):
     awaiting_withdrawal_address = State()
     awaiting_withdrawal_amount = State()
 
+
+class DealCreation(StatesGroup):
+    awaiting_seller_username = State()
+    awaiting_amount = State()
+    awaiting_payment_method = State()
+
+

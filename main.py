@@ -41,7 +41,6 @@ from database.database_utils import (
     get_deal_by_unique_id
 )
 from wallet_processing import create_payout
-from sheets.api import job_function, scheduler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
@@ -803,10 +802,6 @@ async def main() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("Database tables initialized.")
-
-    # 2. Concurrently run the sheets sync background job scheduler
-    asyncio.create_task(scheduler(120, job_function))
-    logger.info("Sheets synchronization job scheduled.")
 
     # 3. Setup Bot Dispatcher and router configs
     dp = Dispatcher()
