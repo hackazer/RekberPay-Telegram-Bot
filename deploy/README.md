@@ -40,7 +40,7 @@ To allow the container to securely access the host's MySQL:
    ```
 
 ### 2.3. Setup docker-compose.yml
-1. Copy project files to your server directory (e.g., `/var/www/rekberpay`).
+1. Copy project files to your server directory (e.g., `/var/www/rekberpay-tg`).
 2. Open `docker-compose.yml` and modify the environment settings:
    * `MYSQL_HOST`: Set to `host.docker.internal` (Docker will resolve this to the host machine gateway IP).
    * `MYSQL_USER`: `rekberpay_user`
@@ -123,10 +123,10 @@ ADMIN_PASSWORD=secure_admin_password
    [Service]
    Type=simple
    User=www-data
-   WorkingDirectory=/var/www/rekberpay
-   ExecStart=/var/www/rekberpay/.venv/bin/python main.py
+   WorkingDirectory=/var/www/rekberpay-tg
+   ExecStart=/var/www/rekberpay-tg/.venv/bin/python main.py
    Restart=always
-   EnvironmentFile=/var/www/rekberpay/.env
+   EnvironmentFile=/var/www/rekberpay-tg/.env
 
    [Install]
    WantedBy=multi-user.target
