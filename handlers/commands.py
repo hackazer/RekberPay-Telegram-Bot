@@ -127,6 +127,7 @@ async def create_a_lobby(message: Message, state: FSMContext) -> None:
         bot_info = await message.bot.get_me()
         bot_username = bot_info.username
         group_id = message.chat.id
+        await state.update_data(group_id=group_id)
         deep_link = f"https://t.me/{bot_username}?start=new_deal_{group_id}"
         
         text = (
@@ -233,13 +234,36 @@ async def dispute_solver(message: types.Message, state: FSMContext) -> None:
 
     # Parse args manually to make it robust
     parts = message.text.split(maxsplit=1)
-    if len(parts) < 2:
-        await message.reply("Please provide the unique ID of the deal you wish to dispute. Usage: /dispute <unique_id>")
-        return
+    
+    unique_id = None
+    if len(parts) >= 2:
+        unique_id_str = parts[1].strip()
+        try:
+            unique_id = bytes.fromhex(unique_id_str)
+        except ValueError:
+            unique_id = unique_id_str
+    else:
+        if message.chat.type in ['group', 'supergroup']:
+            async with async_session() as session:
+                from database.models import Deal
+                stmt = select(Deal).where(
+                    (Deal.group_id == str(message.chat.id)) & 
+                    (Deal.status == 'Active')
+                )
+                res = await session.execute(stmt)
+                db_deal = res.scalars().first()
+                if db_deal:
+                    unique_id = db_deal.unique_id
+                else:
+                    await message.reply("No active deal found for this group chat.")
+                    return
+        else:
+            await message.reply("Please provide the unique ID of the deal you wish to dispute. Usage: /dispute <unique_id>")
+            return
 
-    unique_id = parts[1].strip()
+    mongo_uid = unique_id.hex() if isinstance(unique_id, bytes) else unique_id
 
-    deal = await collection_lobby.find_one({"unique_id": unique_id, "Status": "Active"})
+    deal = await collection_lobby.find_one({"unique_id": mongo_uid, "Status": "Active"})
 
     if not deal:
         await message.reply("No active deal found with the provided unique ID.")
@@ -257,14 +281,35 @@ async def dispute_solver(message: types.Message, state: FSMContext) -> None:
         await message.reply("This deal is already under dispute.")
         return
 
-    await collection_lobby.update_one({"unique_id": unique_id}, {"$set": {"Status": "Disputed"}})
+    await collection_lobby.update_one({"unique_id": mongo_uid}, {"$set": {"Status": "Disputed"}})
+
+    # Also update the MySQL Deal status to 'Disputed' if it exists there
+    async with async_session() as session:
+        from database.models import Deal
+        db_unique_id = unique_id
+        if isinstance(db_unique_id, str):
+            try:
+                if len(db_unique_id) == 32:
+                    db_unique_id = bytes.fromhex(db_unique_id)
+                else:
+                    db_unique_id = db_unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+            except ValueError:
+                db_unique_id = db_unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+        elif isinstance(db_unique_id, int):
+            db_unique_id = db_unique_id.to_bytes(16, byteorder='big')
+        stmt = select(Deal).where(Deal.unique_id == db_unique_id)
+        res = await session.execute(stmt)
+        sql_deal = res.scalars().first()
+        if sql_deal:
+            sql_deal.status = 'Disputed'
+            await session.commit()
 
     # Generate the invite link for the group chat
     invite_link = await message.chat.export_invite_link()
 
     # Notify the moderator by sending them the invite link directly
     notify_message = (
-        f"A dispute has been raised for Deal ID {unique_id} in the group '{message.chat.title}'. "
+        f"A dispute has been raised for Deal ID {mongo_uid} in the group '{message.chat.title}'. "
         f"Please join using this invite link to assist: {invite_link}"
     )
     await message.bot.send_message(chat_id=moderator_id, text=notify_message)

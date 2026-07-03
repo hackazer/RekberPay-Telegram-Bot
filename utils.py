@@ -68,17 +68,8 @@ class RoleFilter(Filter):
 
 
 async def generate_unique_id(collection=None, max_value=9999):
-    from config import async_session
-    from sqlalchemy.future import select
-    from database.models import Deal
-    async with async_session() as session:
-        while True:
-            uid = random.randint(1000, max_value)
-            result = await session.execute(
-                select(Deal).where((Deal.unique_id == uid) & (Deal.status == 'Active'))
-            )
-            if not result.scalars().first():
-                return uid
+    import uuid6
+    return uuid6.uuid7().bytes
 
 
 async def button_builder(text_list: list, callback: list, ) -> InlineKeyboardBuilder:

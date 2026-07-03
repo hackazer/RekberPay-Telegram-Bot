@@ -80,7 +80,8 @@ async def process_create_deal_method(callback: types.CallbackQuery, state: FSMCo
             amount=amount,
             transfer_method="USDT_TRON",
             gateway_fee=gateway_fee,
-            payment_method=payment_method
+            payment_method=payment_method,
+            group_id=str(group_id) if group_id is not None else None
         )
 
     await state.clear()
@@ -88,7 +89,7 @@ async def process_create_deal_method(callback: types.CallbackQuery, state: FSMCo
 
     method_display = "Internal Wallet" if payment_method == "WALLET" else "Payment Gateway"
     group_text = (
-        f"🔍 <b>Deal Confirmation (ID: {unique_id})</b>\n"
+        f"🔍 <b>Deal Confirmation (ID: {unique_id.hex()})</b>\n"
         "Please review the details:\n\n"
         f"👤 Seller: @{seller_username}\n"
         f"👥 Buyer: @{buyer_username}\n"
@@ -99,7 +100,7 @@ async def process_create_deal_method(callback: types.CallbackQuery, state: FSMCo
 
     reply_keyboard = await button_builder(
         ["The data is incorrect", "Continue with the deal"],
-        ["resubmit_form", "continue_deal"]
+        ["resubmit_form", f"continue_{deal.unique_id.hex()}"]
     )
     reply_keyboard.adjust(1, 1)
 
@@ -153,7 +154,7 @@ async def handle_incorrect_data_submission(callback: types.CallbackQuery) -> Non
     await callback.message.answer(message_text, parse_mode=ParseMode.HTML)
 
 
-@form_router.callback_query(F.data == "continue_deal")
+@form_router.callback_query(F.data.startswith("continue_"))
 async def continue_deal(callback: types.CallbackQuery, state: FSMContext) -> None:
     await callback.answer()
     
@@ -167,26 +168,21 @@ async def continue_deal(callback: types.CallbackQuery, state: FSMContext) -> Non
         username = callback.from_user.username
         user_id = callback.from_user.id
 
-        result = await session.execute(
-            select(Deal).where(Deal.status == 'Active')
-        )
-        deals = result.scalars().all()
-        deal = None
-        buyer_user = None
-        seller_user = None
-        
-        for d in deals:
-            buyer_res = await session.execute(select(User).where(User.id == d.buyer_id))
-            buyer_user = buyer_res.scalars().first()
-            seller_res = await session.execute(select(User).where(User.id == d.seller_id))
-            seller_user = seller_res.scalars().first()
-            
-            if (buyer_user and buyer_user.username == username.lstrip('@')) or (seller_user and seller_user.username == username.lstrip('@')):
-                deal = d
-                break
-                
-        if not deal:
+        from database.database_utils import get_deal_by_unique_id
+        deal_id_hex = callback.data.split("_")[1]
+        deal = await get_deal_by_unique_id(session, deal_id_hex)
+
+        if not deal or deal.status != 'Active':
             await callback.message.answer("No active deal found associated with your account. Please start a new deal.")
+            return
+
+        buyer_res = await session.execute(select(User).where(User.id == deal.buyer_id))
+        buyer_user = buyer_res.scalars().first()
+        seller_res = await session.execute(select(User).where(User.id == deal.seller_id))
+        seller_user = seller_res.scalars().first()
+        
+        if not ((buyer_user and buyer_user.username == username.lstrip('@')) or (seller_user and seller_user.username == username.lstrip('@'))):
+            await callback.message.answer("You are not a part of this deal.")
             return
 
         users_interacted = deal.users_interacted or []
@@ -246,7 +242,7 @@ async def continue_deal(callback: types.CallbackQuery, state: FSMContext) -> Non
                 buyer_user.wallet_balance -= total_amount
                 session.add(buyer_user)
                 
-                tx_id = f"WT-{deal.unique_id}-{random.randint(100000, 999999)}"
+                tx_id = f"WT-{deal.unique_id.hex()}-{random.randint(100000, 999999)}"
                 tx = await save_transaction(
                     session=session,
                     user_id=buyer_user.id,
@@ -285,7 +281,7 @@ async def continue_deal(callback: types.CallbackQuery, state: FSMContext) -> Non
                     if not api_key:
                         raise ValueError("NOWPayments API Key not configured.")
 
-                    order_id = f"DEAL-{deal.unique_id}-{random.randint(100000, 999999)}"
+                    order_id = f"DEAL-{deal.unique_id.hex()}-{random.randint(100000, 999999)}"
                     payment_data = await create_payment(
                         price_amount=float(total_amount),
                         price_currency="usd",
@@ -328,7 +324,7 @@ async def continue_deal(callback: types.CallbackQuery, state: FSMContext) -> Non
                     )
                 except Exception as e:
                     logger.warning(f"NOWPayments create_payment failed: {e}. Falling back to simulation.")
-                    payment_id = f"GW-{deal.unique_id}-{random.randint(100000, 999999)}"
+                    payment_id = f"GW-{deal.unique_id.hex()}-{random.randint(100000, 999999)}"
                     mock_address = "TXYZ1234567890MOCKGATEWAYADDRESS"
                     pay_amount = total_amount
 
@@ -463,7 +459,7 @@ async def send_random_value(callback: types.CallbackQuery, state: FSMContext) ->
                 user_id=seller.id,
                 deal_id=deal.id,
                 tx_type="ESCROW_RELEASE",
-                payment_id=f"REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                payment_id=f"REL-{deal.unique_id.hex()}-{random.randint(100000, 999999)}",
                 amount=float(deal.amount),
                 currency="USDT",
                 status="completed"
@@ -517,7 +513,7 @@ async def send_random_value(callback: types.CallbackQuery, state: FSMContext) ->
                     user_id=seller.id,
                     deal_id=deal.id,
                     tx_type="ESCROW_RELEASE",
-                    payment_id=f"REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                    payment_id=f"REL-{deal.unique_id.hex()}-{random.randint(100000, 999999)}",
                     amount=float(deal.amount),
                     currency="USDT",
                     status="completed"

@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, BigInteger, String, DECIMAL as Decimal, Boolean, Text, ForeignKey, TIMESTAMP, JSON, func
+from sqlalchemy import Column, Integer, BigInteger, String, DECIMAL as Decimal, Boolean, Text, ForeignKey, TIMESTAMP, JSON, func, BINARY
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -23,7 +23,8 @@ class Deal(Base):
     __tablename__ = 'deals'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    unique_id = Column(Integer, unique=True, nullable=False)
+    unique_id = Column(BINARY(16), unique=True, nullable=False)
+    group_id = Column(String(100), nullable=True)
     seller_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     buyer_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     amount = Column(Decimal(16, 8), nullable=False)

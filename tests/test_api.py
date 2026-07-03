@@ -62,18 +62,18 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
     # --- Task 1: Key Checks / Auth Tests ---
 
     async def test_auth_missing_key(self):
-        response = await self.client.get("/api/v1/deals/1000")
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000")
         self.assertEqual(response.status_code, 401)
         self.assertIn("API Key missing", response.json()["detail"])
 
     async def test_auth_invalid_key(self):
-        response = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-invalid"})
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-invalid"})
         self.assertEqual(response.status_code, 401)
         self.assertIn("Invalid API Key", response.json()["detail"])
 
     async def test_auth_suspended_user(self):
         await self.create_user_and_key(111, "suspended_user", is_suspended=True, key_str="RP-suspended")
-        response = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-suspended"})
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-suspended"})
         self.assertEqual(response.status_code, 403)
         self.assertIn("User is suspended", response.json()["detail"])
 
@@ -84,13 +84,13 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add(api_key)
             await session.commit()
             
-        response = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-ghost"})
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-ghost"})
         self.assertEqual(response.status_code, 403)
         self.assertIn("User not found", response.json()["detail"])
 
     async def test_auth_revoked_key(self):
         await self.create_user_and_key(222, "revoked_user", is_suspended=False, key_str="RP-revoked", key_active=False)
-        response = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-revoked"})
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-revoked"})
         self.assertEqual(response.status_code, 401)
         self.assertIn("Invalid API Key", response.json()["detail"])
 
@@ -98,7 +98,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         user, api_key = await self.create_user_and_key(333, "revokable_user", key_str="RP-torevoke")
         
         # Verify it works initially (404 Deal not found instead of 401/403)
-        response = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-torevoke"})
+        response = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-torevoke"})
         self.assertEqual(response.status_code, 404)
         
         # Use basic auth credentials from config
@@ -115,7 +115,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(revoke_res.json()["success"])
         
         # Verify it is now invalid
-        response2 = await self.client.get("/api/v1/deals/1000", headers={"X-API-KEY": "RP-torevoke"})
+        response2 = await self.client.get("/api/v1/deals/0190772b1a237190b4ad624f114c0000", headers={"X-API-KEY": "RP-torevoke"})
         self.assertEqual(response2.status_code, 401)
 
     # --- Task 2: POST /api/v1/deals Tests ---
@@ -154,7 +154,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
         # Check DB
         async with self.Session() as session:
             db_res = await session.execute(
-                select(Deal).where(Deal.unique_id == data["unique_id"])
+                select(Deal).where(Deal.unique_id == bytes.fromhex(data["unique_id"]))
             )
             deal = db_res.scalars().first()
             self.assertIsNotNone(deal)
@@ -173,8 +173,9 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0006")
             deal = Deal(
-                unique_id=1234,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("150.0"),
@@ -188,12 +189,12 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
         response = await self.client.get(
-            "/api/v1/deals/1234",
+            "/api/v1/deals/0190772b1a237190b4ad624f114c0006",
             headers={"X-API-KEY": "RP-valid2"}
         )
         self.assertEqual(response.status_code, 200)
         data = response.json()
-        self.assertEqual(data["unique_id"], 1234)
+        self.assertEqual(data["unique_id"], "0190772b1a237190b4ad624f114c0006")
         self.assertEqual(data["buyer_username"], "buyer_one")
         self.assertEqual(data["seller_username"], "seller_one")
         self.assertEqual(data["amount"], 150.0)
@@ -210,8 +211,9 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0007")
             deal = Deal(
-                unique_id=5678,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("50.0"),
@@ -225,7 +227,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
         response = await self.client.post(
-            "/api/v1/deals/5678/release",
+            "/api/v1/deals/0190772b1a237190b4ad624f114c0007/release",
             headers={"X-API-KEY": "RP-valid3"}
         )
         self.assertEqual(response.status_code, 200)
@@ -237,7 +239,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             seller_db = s_res.scalars().first()
             self.assertEqual(seller_db.wallet_balance, Decimal("60.0"))
             
-            d_res = await session.execute(select(Deal).where(Deal.unique_id == 5678))
+            d_res = await session.execute(select(Deal).where(Deal.unique_id == uid))
             deal_db = d_res.scalars().first()
             self.assertEqual(deal_db.status, "Completed")
             
@@ -258,8 +260,9 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0008")
             deal = Deal(
-                unique_id=9012,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("100.0"),
@@ -274,7 +277,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
         response = await self.client.post(
-            "/api/v1/deals/9012/release",
+            "/api/v1/deals/0190772b1a237190b4ad624f114c0008/release",
             headers={"X-API-KEY": "RP-valid4"}
         )
         self.assertEqual(response.status_code, 200)
@@ -285,7 +288,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             seller_db = s_res.scalars().first()
             self.assertEqual(seller_db.wallet_balance, Decimal("0.0"))
             
-            d_res = await session.execute(select(Deal).where(Deal.unique_id == 9012))
+            d_res = await session.execute(select(Deal).where(Deal.unique_id == uid))
             deal_db = d_res.scalars().first()
             self.assertEqual(deal_db.status, "Completed")
             
@@ -306,8 +309,9 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0009")
             deal = Deal(
-                unique_id=9013,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("100.0"),
@@ -322,7 +326,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
         response = await self.client.post(
-            "/api/v1/deals/9013/release",
+            "/api/v1/deals/0190772b1a237190b4ad624f114c0009/release",
             headers={"X-API-KEY": "RP-valid5"}
         )
         self.assertEqual(response.status_code, 200)
@@ -340,8 +344,9 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c000a")
             deal = Deal(
-                unique_id=9014,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("100.0"),
@@ -356,7 +361,7 @@ class TestAPI(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
         response = await self.client.post(
-            "/api/v1/deals/9014/release",
+            "/api/v1/deals/0190772b1a237190b4ad624f114c000a/release",
             headers={"X-API-KEY": "RP-valid6"}
         )
         self.assertEqual(response.status_code, 200)

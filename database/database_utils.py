@@ -1,4 +1,5 @@
 import random
+import uuid6
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -64,7 +65,17 @@ async def get_active_deal_by_user(session: AsyncSession, telegram_id: int) -> De
     )
     return result.scalars().first()
 
-async def get_deal_by_unique_id(session: AsyncSession, unique_id: int) -> Deal:
+async def get_deal_by_unique_id(session: AsyncSession, unique_id) -> Deal:
+    if isinstance(unique_id, str):
+        try:
+            if len(unique_id) == 32:
+                unique_id = bytes.fromhex(unique_id)
+            else:
+                unique_id = unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+        except ValueError:
+            unique_id = unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+    elif isinstance(unique_id, int):
+        unique_id = unique_id.to_bytes(16, byteorder='big')
     result = await session.execute(
         select(Deal).where(Deal.unique_id == unique_id)
     )
@@ -90,14 +101,25 @@ async def _get_or_create_dummy_user(session: AsyncSession, username: str) -> Use
 
 async def create_deal(
     session: AsyncSession,
-    unique_id: int,
+    unique_id,
     buyer_username: str,
     seller_username: str,
     amount: float,
     transfer_method: str,
     gateway_fee: float = 0.0,
-    payment_method: str = "GATEWAY"
+    payment_method: str = "GATEWAY",
+    group_id: str = None
 ) -> Deal:
+    if isinstance(unique_id, str):
+        try:
+            if len(unique_id) == 32:
+                unique_id = bytes.fromhex(unique_id)
+            else:
+                unique_id = unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+        except ValueError:
+            unique_id = unique_id.encode('utf-8')[:16].ljust(16, b'\x00')
+    elif isinstance(unique_id, int):
+        unique_id = unique_id.to_bytes(16, byteorder='big')
     buyer = await _get_or_create_dummy_user(session, buyer_username)
     seller = await _get_or_create_dummy_user(session, seller_username)
     
@@ -108,6 +130,7 @@ async def create_deal(
     
     deal = Deal(
         unique_id=unique_id,
+        group_id=group_id,
         buyer_id=buyer.id,
         seller_id=seller.id,
         amount=dec_amount,
@@ -198,12 +221,5 @@ async def suspend_user(session: AsyncSession, telegram_id: int, suspend: bool = 
         user.is_suspended = suspend
         await session.commit()
 
-async def generate_unique_id(session: AsyncSession) -> int:
-    while True:
-        uid = random.randint(1000, 9999)
-        # Check if this unique_id is used in any active deal
-        result = await session.execute(
-            select(Deal).where((Deal.unique_id == uid) & (Deal.status == 'Active'))
-        )
-        if not result.scalars().first():
-            return uid
+async def generate_unique_id(session: AsyncSession) -> bytes:
+    return uuid6.uuid7().bytes

@@ -212,7 +212,7 @@ async def list_deals(username: str = Depends(authenticate_admin)):
             seller_username = seller_res.scalar() or "N/A"
             result.append({
                 "id": d.id,
-                "unique_id": d.unique_id,
+                "unique_id": d.unique_id.hex() if isinstance(d.unique_id, bytes) else d.unique_id,
                 "buyer_username": buyer_username,
                 "seller_username": seller_username,
                 "amount": float(d.amount),
@@ -229,8 +229,7 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
     action = data.get("action")
     
     async with async_session() as session:
-        res = await session.execute(select(Deal).where(Deal.unique_id == uid))
-        deal = res.scalars().first()
+        deal = await get_deal_by_unique_id(session, uid)
         if not deal:
             return {"success": False, "error": "Deal not found"}
             
@@ -250,7 +249,7 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
                     user_id=seller.id,
                     deal_id=deal.id,
                     tx_type="ESCROW_RELEASE",
-                    payment_id=f"DISP-REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                    payment_id=f"DISP-REL-{deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}-{random.randint(100000, 999999)}",
                     amount=float(deal.amount),
                     currency="USDT",
                     status="completed"
@@ -261,11 +260,11 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
                 try:
                     await bot.send_message(
                         chat_id=seller.telegram_id,
-                        text=f"✅ Admin has resolved a dispute on Deal ID {deal.unique_id} in your favor! {deal.amount} USDT has been credited to your balance."
+                        text=f"✅ Admin has resolved a dispute on Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} in your favor! {deal.amount} USDT has been credited to your balance."
                     )
                     await bot.send_message(
                         chat_id=buyer.telegram_id,
-                        text=f"ℹ️ Admin has resolved a dispute on Deal ID {deal.unique_id} and released the funds to the seller."
+                        text=f"ℹ️ Admin has resolved a dispute on Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} and released the funds to the seller."
                     )
                 except Exception as e:
                     logger.error(f"Failed to send bot notification: {e}")
@@ -297,7 +296,7 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
                         user_id=seller.id,
                         deal_id=deal.id,
                         tx_type="ESCROW_RELEASE",
-                        payment_id=f"DISP-REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                        payment_id=f"DISP-REL-{deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}-{random.randint(100000, 999999)}",
                         amount=float(deal.amount),
                         currency="USDT",
                         status="completed"
@@ -318,7 +317,7 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
                 user_id=buyer.id,
                 deal_id=deal.id,
                 tx_type="ESCROW_RELEASE",
-                payment_id=f"DISP-REF-{deal.unique_id}-{random.randint(100000, 999999)}",
+                payment_id=f"DISP-REF-{deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}-{random.randint(100000, 999999)}",
                 amount=float(deal.amount),
                 currency="USDT",
                 status="completed"
@@ -329,11 +328,11 @@ async def resolve_dispute(data: dict, username: str = Depends(authenticate_admin
             try:
                 await bot.send_message(
                     chat_id=buyer.telegram_id,
-                    text=f"✅ Dispute on Deal ID {deal.unique_id} resolved: escrow amount of {deal.amount} USDT has been refunded to your wallet balance."
+                    text=f"✅ Dispute on Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} resolved: escrow amount of {deal.amount} USDT has been refunded to your wallet balance."
                 )
                 await bot.send_message(
                     chat_id=seller.telegram_id,
-                    text=f"ℹ️ Dispute on Deal ID {deal.unique_id} resolved: escrow amount refunded to buyer."
+                    text=f"ℹ️ Dispute on Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} resolved: escrow amount refunded to buyer."
                 )
             except Exception as e:
                 logger.error(f"Failed to send bot notification: {e}")
@@ -550,7 +549,7 @@ async def nowpayments_webhook(request: Request):
                         await session.commit()
 
                         message_text = (
-                            f"🔔 <b>Payment Confirmed for Deal ID {deal.unique_id}!</b>\n\n"
+                            f"🔔 <b>Payment Confirmed for Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}!</b>\n\n"
                             f"Buyer @{buyer.username if buyer else 'buyer'} has successfully deposited the funds.\n"
                             f"Seller @{seller.username if seller else 'seller'} can now proceed with delivering the items."
                         )
@@ -650,7 +649,7 @@ async def api_create_deal(
         await session.refresh(deal)
         
         return {
-            "unique_id": deal.unique_id,
+            "unique_id": deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id,
             "buyer_username": payload.buyer_username.lstrip('@'),
             "seller_username": payload.seller_username.lstrip('@'),
             "amount": float(deal.amount),
@@ -660,7 +659,7 @@ async def api_create_deal(
 
 @app.get("/api/v1/deals/{unique_id}")
 async def api_get_deal(
-    unique_id: int,
+    unique_id: str,
     user: User = Depends(get_api_key)
 ):
     async with async_session() as session:
@@ -674,7 +673,7 @@ async def api_get_deal(
         seller_username = seller_res.scalar() or "N/A"
         
         return {
-            "unique_id": deal.unique_id,
+            "unique_id": deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id,
             "buyer_username": buyer_username,
             "seller_username": seller_username,
             "amount": float(deal.amount),
@@ -684,7 +683,7 @@ async def api_get_deal(
 
 @app.post("/api/v1/deals/{unique_id}/release")
 async def api_release_deal(
-    unique_id: int,
+    unique_id: str,
     user: User = Depends(get_api_key)
 ):
     async with async_session() as session:
@@ -710,7 +709,7 @@ async def api_release_deal(
                 user_id=seller.id,
                 deal_id=deal.id,
                 tx_type="ESCROW_RELEASE",
-                payment_id=f"REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                payment_id=f"REL-{deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}-{random.randint(100000, 999999)}",
                 amount=float(deal.amount),
                 currency="USDT",
                 status="completed"
@@ -729,7 +728,7 @@ async def api_release_deal(
                 if buyer and buyer.telegram_id:
                     await bot.send_message(
                         chat_id=buyer.telegram_id,
-                        text=f"ℹ️ Escrow funds for Deal ID {deal.unique_id} have been released to the seller."
+                        text=f"ℹ️ Escrow funds for Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} have been released to the seller."
                     )
             except Exception as e:
                 logger.error(f"Failed to send bot notification: {e}")
@@ -762,7 +761,7 @@ async def api_release_deal(
                     user_id=seller.id,
                     deal_id=deal.id,
                     tx_type="ESCROW_RELEASE",
-                    payment_id=f"REL-{deal.unique_id}-{random.randint(100000, 999999)}",
+                    payment_id=f"REL-{deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id}-{random.randint(100000, 999999)}",
                     amount=float(deal.amount),
                     currency="USDT",
                     status="completed"
@@ -781,7 +780,7 @@ async def api_release_deal(
                     if buyer and buyer.telegram_id:
                         await bot.send_message(
                             chat_id=buyer.telegram_id,
-                            text=f"ℹ️ Escrow funds for Deal ID {deal.unique_id} have been released to the seller."
+                            text=f"ℹ️ Escrow funds for Deal ID {deal.unique_id.hex() if isinstance(deal.unique_id, bytes) else deal.unique_id} have been released to the seller."
                         )
                 except Exception as e:
                     logger.error(f"Failed to send bot notification: {e}")

@@ -108,8 +108,9 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             await session.commit()
             
             # Create active deal
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0001")
             deal = Deal(
-                unique_id=1001,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("100.00"),
@@ -124,12 +125,12 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             # Fetch for buyer
             buyer_deal = await get_active_deal_by_user(session, 111)
             self.assertIsNotNone(buyer_deal)
-            self.assertEqual(buyer_deal.unique_id, 1001)
+            self.assertEqual(buyer_deal.unique_id, uid)
             
             # Fetch for seller
             seller_deal = await get_active_deal_by_user(session, 222)
             self.assertIsNotNone(seller_deal)
-            self.assertEqual(seller_deal.unique_id, 1001)
+            self.assertEqual(seller_deal.unique_id, uid)
             
             # Fetch for unrelated user
             unrelated_deal = await get_active_deal_by_user(session, 999)
@@ -150,8 +151,9 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0002")
             deal = Deal(
-                unique_id=9876,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("50.0"),
@@ -163,9 +165,9 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             session.add(deal)
             await session.commit()
             
-            fetched = await get_deal_by_unique_id(session, 9876)
+            fetched = await get_deal_by_unique_id(session, "0190772b1a237190b4ad624f114c0002")
             self.assertIsNotNone(fetched)
-            self.assertEqual(fetched.unique_id, 9876)
+            self.assertEqual(fetched.unique_id, uid)
             self.assertEqual(fetched.amount, Decimal("50.0"))
 
     async def test_create_deal(self):
@@ -176,9 +178,10 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid1 = bytes.fromhex("0190772b1a237190b4ad624f114c0003")
             deal = await create_deal(
                 session=session,
-                unique_id=1234,
+                unique_id=uid1,
                 buyer_username="buyer_user",
                 seller_username="seller_user",
                 amount=200.0,
@@ -187,16 +190,17 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
                 payment_method="GATEWAY"
             )
             self.assertIsNotNone(deal)
-            self.assertEqual(deal.unique_id, 1234)
+            self.assertEqual(deal.unique_id, uid1)
             self.assertEqual(deal.buyer_id, buyer.id)
             self.assertEqual(deal.seller_id, seller.id)
             self.assertEqual(deal.amount, Decimal("200.0"))
             self.assertEqual(deal.gateway_fee, Decimal("1.5"))
             
             # 2. Create deal with non-existent users (should create dummy users)
+            uid2 = bytes.fromhex("0190772b1a237190b4ad624f114c0004")
             deal2 = await create_deal(
                 session=session,
-                unique_id=5678,
+                unique_id=uid2,
                 buyer_username="ghost_buyer",
                 seller_username="ghost_seller",
                 amount=150.0,
@@ -223,8 +227,9 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
             session.add_all([buyer, seller])
             await session.commit()
             
+            uid = bytes.fromhex("0190772b1a237190b4ad624f114c0005")
             deal = Deal(
-                unique_id=1001,
+                unique_id=uid,
                 buyer_id=buyer.id,
                 seller_id=seller.id,
                 amount=Decimal("100.00"),
@@ -338,41 +343,6 @@ class TestDatabaseUtils(unittest.IsolatedAsyncioTestCase):
 
     async def test_generate_unique_id(self):
         async with self.Session() as session:
-            # Generate multiple times, make sure they are within 1000 and 9999
-            for _ in range(10):
-                uid = await generate_unique_id(session)
-                self.assertTrue(1000 <= uid <= 9999)
-            
-            # Add an active deal using unique ID 1234
-            buyer = User(telegram_id=111, username="buyer")
-            seller = User(telegram_id=222, username="seller")
-            session.add_all([buyer, seller])
-            await session.commit()
-            
-            deal = Deal(
-                unique_id=1234,
-                buyer_id=buyer.id,
-                seller_id=seller.id,
-                amount=Decimal("10.0"),
-                escrow_fee=Decimal("0.5"),
-                total_amount=Decimal("10.5"),
-                payment_method="GATEWAY",
-                status="Active"
-            )
-            session.add(deal)
-            await session.commit()
-            
-            # Now mock random.randint to return 1234 first, then 5678.
-            # We want to verify generate_unique_id skips 1234 because it is active.
-            from unittest import mock
-            with mock.patch("random.randint", side_effect=[1234, 5678]):
-                uid = await generate_unique_id(session)
-                self.assertEqual(uid, 5678)
-                
-            # If the deal is completed, 1234 is no longer active, so it should be allowed again.
-            deal.status = "Completed"
-            await session.commit()
-            
-            with mock.patch("random.randint", side_effect=[1234, 5678]):
-                uid = await generate_unique_id(session)
-                self.assertEqual(uid, 1234)
+            uid = await generate_unique_id(session)
+            self.assertIsInstance(uid, bytes)
+            self.assertEqual(len(uid), 16)
